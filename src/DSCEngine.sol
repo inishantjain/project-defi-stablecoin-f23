@@ -6,6 +6,7 @@ import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import {OracleLib} from "./libraries/OracleLib.sol";
 
 /**
  * @title DSCEngine
@@ -36,6 +37,12 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__MintFailed();
     error DSCEngine__HealthFactorIsOk();
     error DSCEngine__HealthFactorNotImproved();
+
+    ///////////////////////
+    ////////Errors/////////
+    ///////////////////////
+
+    using OracleLib for AggregatorV3Interface;
 
     ///////////////////////
     ////State Variables////
@@ -171,7 +178,7 @@ contract DSCEngine is ReentrancyGuard {
      * @notice you can partially liquidate the user.
      * @notice you will get liquidation bonus for taking the user's funds
      * @notice this function assumes that the protocol is roughly 200% overcollateralized in order for this to work.
-     * @notice a known bug would be if the protocol is 100% or less collateralized, the we wouldn't be able to incess the liquidators
+     * @notice a known bug would be if the protocol is 100% or less collateralized, then we wouldn't be able to reward  the liquidators
      * for example if the price of the collateral is plummeted before anyone could be liquidated
      * follows cei
      */
@@ -287,7 +294,7 @@ contract DSCEngine is ReentrancyGuard {
 
     function _getUsdValue(address token, uint256 amount) private view returns (uint256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
-        (, int256 price,,,) = priceFeed.latestRoundData();
+        (, int256 price,,,) = priceFeed.staleCheckLatestRoundData();
         // 1 ETH = 1000 USD
         // The returned value from Chainlink will be 1000 * 1e8 (that means 1000$)
         // Most USD pairs have 8 decimals, so we will just pretend they all do
@@ -343,7 +350,7 @@ contract DSCEngine is ReentrancyGuard {
         //$/ETH ETH ??
         //$2000 / ETH $1000 = 0.5ETH
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
-        (, int256 price,,,) = priceFeed.latestRoundData();
+        (, int256 price,,,) = priceFeed.staleCheckLatestRoundData();
 
         return (usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
     }
